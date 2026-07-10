@@ -10,6 +10,22 @@ requires a Shipper's Declaration.
 > its addenda, applicable national rules, operator variations, or trained-person
 > review.
 
+## Installation
+
+`iata-dangerous-goods` requires Python 3.11 or later and has no runtime
+dependencies.
+
+```console
+python -m pip install iata-dangerous-goods
+```
+
+The PyPI distribution is named `iata-dangerous-goods`; the Python import package
+is named `dg`:
+
+```python
+from dg import Shipment, validate_shipment
+```
+
 ## Design
 
 - `dg/models.py` contains facts about a proposed shipment.
@@ -121,8 +137,24 @@ shipping name as `PROPER SHIPPING NAME (chemical A, chemical B)`.
 
 ## Run the tests
 
+Install an editable development copy with the packaging tools:
+
+```powershell
+python -m pip install -e ".[dev]"
+```
+
 ```powershell
 python -m unittest discover -v
 ```
+
+Build the same wheel and source archive that are published to PyPI:
+
+```powershell
+python -m build
+python -m twine check dist/*
+```
+
+See the [release guide](https://github.com/theo-bender/iata-dangerous-goods/blob/main/RELEASING.md)
+for the Trusted Publishing release process.
 
 The test UN9999 entry is fictional and exists only inside the test suite.

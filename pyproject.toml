@@ -1,14 +1,53 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "iata-dangerous-goods"
 version = "0.1.0"
 description = "A small, manually verified dangerous-goods shipment validator"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "theo-bender" },
+]
+keywords = [
+    "air-cargo",
+    "dangerous-goods",
+    "iata",
+    "shipping",
+    "validation",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2.2",
+    "twine>=6.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/theo-bender/iata-dangerous-goods"
+Repository = "https://github.com/theo-bender/iata-dangerous-goods.git"
+Issues = "https://github.com/theo-bender/iata-dangerous-goods/issues"
 
 [tool.setuptools.packages.find]
+where = ["."]
 include = ["dg*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+dg = ["py.typed"]
