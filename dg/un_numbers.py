@@ -247,7 +247,7 @@ UN_3481_CONTAINED_IN_EQUIPMENT = DangerousGoodsDefinition(
 
 UN_3481_PACKED_WITH_EQUIPMENT = DangerousGoodsDefinition(
     un_number=3481,
-    variant="paxked_with_equipment",
+    variant="packed_with_equipment",
     proper_shipping_name="Lithium ion batteries packed with equipment",
     primary_hazard=HazardClass.CLASS_9,
     subsidiary_hazards=(),
