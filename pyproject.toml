@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iata-dangerous-goods"
+version = "0.1.0"
+description = "A small, manually verified dangerous-goods shipment validator"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+
+[tool.setuptools.packages.find]
+include = ["dg*"]
