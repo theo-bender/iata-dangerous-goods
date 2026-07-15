@@ -52,6 +52,8 @@ class UnitOfMeasurement(Enum):
 
 
 class AircraftType(Enum):
+    """Aircraft limitation derived from a selected transport rule."""
+
     PASSENGER_AND_CARGO = "passenger_and_cargo"
     CARGO_ONLY = "cargo_only"
 
@@ -141,7 +143,6 @@ class Shipment:
 
     un_number: int
     packages: tuple[Package, ...]
-    aircraft_type: AircraftType
     ship_date: date
     definition_variant: str | None = None
     requested_mode: TransportMode | None = None

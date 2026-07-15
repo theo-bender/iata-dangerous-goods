@@ -62,6 +62,16 @@ class ValidationReport:
     def declaration_required(self) -> bool:
         return bool(self.selected_rule and self.selected_rule.declaration_required)
 
+    @property
+    def aircraft_limitation(self) -> AircraftType | None:
+        """Aircraft category implied by the selected transport rule."""
+
+        if self.selected_rule is None:
+            return None
+        if self.selected_rule.mode is TransportMode.CARGO_AIRCRAFT_ONLY:
+            return AircraftType.CARGO_ONLY
+        return AircraftType.PASSENGER_AND_CARGO
+
 
 MODE_PREFERENCE = (
     TransportMode.DE_MINIMIS,
@@ -296,18 +306,6 @@ def _evaluate_rule(shipment: Shipment, rule: TransportRule) -> RuleEvaluation:
             )
         )
         return RuleEvaluation(rule, tuple(issues))
-
-    if (
-        shipment.aircraft_type is AircraftType.PASSENGER_AND_CARGO
-        and rule.mode is TransportMode.CARGO_AIRCRAFT_ONLY
-    ):
-        issues.append(
-            ValidationIssue(
-                code="cargo_aircraft_only",
-                message="This rule cannot be used on a passenger aircraft.",
-                path="aircraft_type",
-            )
-        )
 
     for package_index, package in enumerate(shipment.packages):
         package_path = f"packages[{package_index}]"

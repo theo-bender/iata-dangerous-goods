@@ -92,7 +92,6 @@ def shipment(*, inner: str = "1", net: str = "4", **changes) -> Shipment:
                 inner_receptacles=(InnerReceptacle(Decimal(inner)),),
             ),
         ),
-        "aircraft_type": AircraftType.PASSENGER_AND_CARGO,
         "ship_date": date(2026, 7, 9),
     }
     values.update(changes)
@@ -130,6 +129,10 @@ class ValidationTests(unittest.TestCase):
 
         self.assertTrue(report.is_valid)
         self.assertEqual(report.selected_rule.mode, TransportMode.LIMITED_QUANTITY)
+        self.assertIs(
+            report.aircraft_limitation,
+            AircraftType.PASSENGER_AND_CARGO,
+        )
         self.assertFalse(report.declaration_required)
 
     def test_package_exposes_stable_packaging_code(self) -> None:
@@ -147,7 +150,42 @@ class ValidationTests(unittest.TestCase):
 
         self.assertTrue(report.is_valid)
         self.assertEqual(report.selected_rule.mode, TransportMode.PASSENGER_AND_CARGO)
+        self.assertIs(
+            report.aircraft_limitation,
+            AircraftType.PASSENGER_AND_CARGO,
+        )
         self.assertTrue(report.declaration_required)
+
+    def test_derives_cargo_aircraft_only_from_selected_rule(self) -> None:
+        cargo_rule = TransportRule(
+            mode=TransportMode.CARGO_AIRCRAFT_ONLY,
+            availability=RuleAvailability.PERMITTED,
+            packing_instruction="998",
+            max_inner_quantity=Decimal("5"),
+            max_package_quantity=Decimal("60"),
+            permitted_packagings=(TEST_PACKAGING,),
+            declaration_required=True,
+        )
+        definition = replace(
+            DEFINITION,
+            rules=DEFINITION.rules[:-1] + (cargo_rule,),
+        )
+        proposed = shipment(
+            net="30",
+            shipper=Party("Example Shipper", "1 Origin Way"),
+            consignee=Party("Example Consignee", "2 Destination Road"),
+        )
+
+        report = validate_shipment(proposed, {(9999, None): definition})
+        declaration = build_declaration(report)
+
+        self.assertTrue(report.is_valid)
+        self.assertEqual(
+            report.selected_rule.mode,
+            TransportMode.CARGO_AIRCRAFT_ONLY,
+        )
+        self.assertIs(report.aircraft_limitation, AircraftType.CARGO_ONLY)
+        self.assertEqual(declaration.aircraft_limitation, "CARGO AIRCRAFT ONLY")
 
     def test_rejects_expired_regulatory_data(self) -> None:
         report = validate_shipment(
@@ -176,6 +214,10 @@ class ValidationTests(unittest.TestCase):
 
         self.assertEqual(declaration.lines[0].un_number, "UN9999")
         self.assertEqual(declaration.lines[0].packing_instruction, "999")
+        self.assertEqual(
+            declaration.aircraft_limitation,
+            "PASSENGER AND CARGO AIRCRAFT",
+        )
         self.assertEqual(
             declaration.lines[0].quantity_and_type_of_packing,
             "1 Fibreboard Box, 6 L",

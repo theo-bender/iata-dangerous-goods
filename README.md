@@ -40,6 +40,10 @@ from dg import Shipment, validate_shipment
 Regulatory data is rejected outside its encoded effective dates. Forbidden
 transport is represented explicitly rather than as a zero quantity.
 
+`Shipment` does not require the caller to choose an aircraft category. After
+validation, `ValidationReport.aircraft_limitation` is derived from the selected
+transport rule and is used automatically when declaration data is generated.
+
 ## Add a UN number
 
 Transcribe each definition from an authorized copy of the current IATA DGR and
