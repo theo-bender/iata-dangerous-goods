@@ -199,7 +199,7 @@ UN_3481_CONTAINED_IN_EQUIPMENT = DangerousGoodsDefinition(
             packing_instruction_section=(
                 PackingInstructionSection.SECTION_II
             ),
-            max_inner_quantity=None,
+            max_inner_quantity=Decimal("5"),
             max_package_quantity=Decimal("5"),
             permitted_packagings=(
                 EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
@@ -216,7 +216,7 @@ UN_3481_CONTAINED_IN_EQUIPMENT = DangerousGoodsDefinition(
             packing_instruction_section=(
                 PackingInstructionSection.SECTION_I
             ),
-            max_inner_quantity=None,
+            max_inner_quantity=Decimal("5"),
             max_package_quantity=Decimal("5"),
             permitted_packagings=(),
             declaration_required=True,
@@ -230,7 +230,7 @@ UN_3481_CONTAINED_IN_EQUIPMENT = DangerousGoodsDefinition(
             packing_instruction_section=(
                 PackingInstructionSection.SECTION_I
             ),
-            max_inner_quantity=None,
+            max_inner_quantity=Decimal("35"),
             max_package_quantity=Decimal("35"),
             permitted_packagings=(),
             declaration_required=True,
@@ -276,7 +276,7 @@ UN_3481_PACKED_WITH_EQUIPMENT = DangerousGoodsDefinition(
             packing_instruction_section=(
                 PackingInstructionSection.SECTION_II
             ),
-            max_inner_quantity=None,
+            max_inner_quantity=Decimal("5"),
             max_package_quantity=Decimal("5"),
             permitted_packagings=(
                 EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
@@ -293,7 +293,7 @@ UN_3481_PACKED_WITH_EQUIPMENT = DangerousGoodsDefinition(
             packing_instruction_section=(
                 PackingInstructionSection.SECTION_I
             ),
-            max_inner_quantity=None,
+            max_inner_quantity=Decimal("5"),
             max_package_quantity=Decimal("5"),
             permitted_packagings=(),
             declaration_required=True,
@@ -307,7 +307,7 @@ UN_3481_PACKED_WITH_EQUIPMENT = DangerousGoodsDefinition(
             packing_instruction_section=(
                 PackingInstructionSection.SECTION_I
             ),
-            max_inner_quantity=None,
+            max_inner_quantity=Decimal("35"),
             max_package_quantity=Decimal("35"),
             permitted_packagings=(),
             declaration_required=True,
