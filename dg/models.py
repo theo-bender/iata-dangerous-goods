@@ -54,27 +54,27 @@ class UnitOfMeasurement(Enum):
 class AircraftType(Enum):
     """Aircraft limitation derived from a selected transport rule."""
 
-    PASSENGER_AND_CARGO = "passenger_and_cargo"
-    CARGO_ONLY = "cargo_only"
+    PASSENGER_AND_CARGO = "Passenger and Cargo"
+    CARGO_ONLY = "Cargo Only"
 
 
 class TransportMode(Enum):
     """Transport regimes, ordered from most restrictive relief to standard."""
 
-    DE_MINIMIS = "de_minimis"
-    EXCEPTED_QUANTITY = "excepted_quantity"
-    LIMITED_QUANTITY = "limited_quantity"
-    PASSENGER_AND_CARGO = "passenger_and_cargo"
-    CARGO_AIRCRAFT_ONLY = "cargo_aircraft_only"
+    DE_MINIMIS = "De Minimis"
+    EXCEPTED_QUANTITY = "Excepted Quantity"
+    LIMITED_QUANTITY = "Limited Quantity"
+    PASSENGER_AND_CARGO = "Passenger and Cargo"
+    CARGO_AIRCRAFT_ONLY = "Cargo Aircraft Only"
 
 
 class PackingInstructionSection(Enum):
     """Sections used by packing instructions, including lithium batteries."""
 
-    SECTION_I = "I"
-    SECTION_IA = "IA"
-    SECTION_IB = "IB"
-    SECTION_II = "II"
+    SECTION_I = "Section I"
+    SECTION_IA = "Section IA"
+    SECTION_IB = "Section IB"
+    SECTION_II = "Section II"
 
 
 @dataclass(frozen=True)

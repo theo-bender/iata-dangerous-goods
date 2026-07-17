@@ -178,36 +178,17 @@ UN_3481_CONTAINED_IN_EQUIPMENT = DangerousGoodsDefinition(
     special_provisions=(),
 
     rules=(
-        # PI 967, Section I — passenger and cargo aircraft
         TransportRule(
-            mode=TransportMode.PASSENGER_AND_CARGO,
-            availability=RuleAvailability.PERMITTED,
-            packing_instruction="967",
-            packing_instruction_section=(
-                PackingInstructionSection.SECTION_I
-            ),
-            max_inner_quantity=None,
-            max_package_quantity=Decimal("5"),
-            permitted_packagings=(
-                EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
-            ),
-            declaration_required=True,
+            mode=TransportMode.DE_MINIMIS,
+            availability=RuleAvailability.FORBIDDEN,
         ),
-
-        # PI 967, Section I — cargo aircraft only
         TransportRule(
-            mode=TransportMode.CARGO_AIRCRAFT_ONLY,
-            availability=RuleAvailability.PERMITTED,
-            packing_instruction="967",
-            packing_instruction_section=(
-                PackingInstructionSection.SECTION_I
-            ),
-            max_inner_quantity=None,
-            max_package_quantity=Decimal("35"),
-            permitted_packagings=(
-                EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
-            ),
-            declaration_required=True,
+            mode=TransportMode.EXCEPTED_QUANTITY,
+            availability=RuleAvailability.FORBIDDEN,
+        ),
+        TransportRule(
+            mode=TransportMode.LIMITED_QUANTITY,
+            availability=RuleAvailability.FORBIDDEN,
         ),
 
         # PI 967, Section II — passenger and cargo aircraft
@@ -226,20 +207,33 @@ UN_3481_CONTAINED_IN_EQUIPMENT = DangerousGoodsDefinition(
             declaration_required=False,
         ),
 
-        # PI 967, Section II — cargo aircraft only
+
+        # PI 967, Section I — passenger and cargo aircraft
+        TransportRule(
+            mode=TransportMode.PASSENGER_AND_CARGO,
+            availability=RuleAvailability.PERMITTED,
+            packing_instruction="967",
+            packing_instruction_section=(
+                PackingInstructionSection.SECTION_I
+            ),
+            max_inner_quantity=None,
+            max_package_quantity=Decimal("5"),
+            permitted_packagings=(),
+            declaration_required=True,
+        ),
+
+        # PI 967, Section I — cargo aircraft only
         TransportRule(
             mode=TransportMode.CARGO_AIRCRAFT_ONLY,
             availability=RuleAvailability.PERMITTED,
             packing_instruction="967",
             packing_instruction_section=(
-                PackingInstructionSection.SECTION_II
+                PackingInstructionSection.SECTION_I
             ),
             max_inner_quantity=None,
-            max_package_quantity=Decimal("5"),
-            permitted_packagings=(
-                EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
-            ),
-            declaration_required=False,
+            max_package_quantity=Decimal("35"),
+            permitted_packagings=(),
+            declaration_required=True,
         ),
     ),
 )
@@ -261,36 +255,17 @@ UN_3481_PACKED_WITH_EQUIPMENT = DangerousGoodsDefinition(
     special_provisions=(),
 
     rules=(
-        # PI 967, Section I — passenger and cargo aircraft
         TransportRule(
-            mode=TransportMode.PASSENGER_AND_CARGO,
-            availability=RuleAvailability.PERMITTED,
-            packing_instruction="966",
-            packing_instruction_section=(
-                PackingInstructionSection.SECTION_I
-            ),
-            max_inner_quantity=None,
-            max_package_quantity=Decimal("5"),
-            permitted_packagings=(
-                EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
-            ),
-            declaration_required=True,
+            mode=TransportMode.DE_MINIMIS,
+            availability=RuleAvailability.FORBIDDEN,
         ),
-
-        # PI 967, Section I — cargo aircraft only
         TransportRule(
-            mode=TransportMode.CARGO_AIRCRAFT_ONLY,
-            availability=RuleAvailability.PERMITTED,
-            packing_instruction="966",
-            packing_instruction_section=(
-                PackingInstructionSection.SECTION_I
-            ),
-            max_inner_quantity=None,
-            max_package_quantity=Decimal("35"),
-            permitted_packagings=(
-                EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
-            ),
-            declaration_required=True,
+            mode=TransportMode.EXCEPTED_QUANTITY,
+            availability=RuleAvailability.FORBIDDEN,
+        ),
+        TransportRule(
+            mode=TransportMode.LIMITED_QUANTITY,
+            availability=RuleAvailability.FORBIDDEN,
         ),
 
         # PI 967, Section II — passenger and cargo aircraft
@@ -309,20 +284,33 @@ UN_3481_PACKED_WITH_EQUIPMENT = DangerousGoodsDefinition(
             declaration_required=False,
         ),
 
-        # PI 967, Section II — cargo aircraft only
+
+        # PI 967, Section I — passenger and cargo aircraft
+        TransportRule(
+            mode=TransportMode.PASSENGER_AND_CARGO,
+            availability=RuleAvailability.PERMITTED,
+            packing_instruction="966",
+            packing_instruction_section=(
+                PackingInstructionSection.SECTION_I
+            ),
+            max_inner_quantity=None,
+            max_package_quantity=Decimal("5"),
+            permitted_packagings=(),
+            declaration_required=True,
+        ),
+
+        # PI 967, Section I — cargo aircraft only
         TransportRule(
             mode=TransportMode.CARGO_AIRCRAFT_ONLY,
             availability=RuleAvailability.PERMITTED,
             packing_instruction="966",
             packing_instruction_section=(
-                PackingInstructionSection.SECTION_II
+                PackingInstructionSection.SECTION_I
             ),
             max_inner_quantity=None,
-            max_package_quantity=Decimal("5"),
-            permitted_packagings=(
-                EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM,
-            ),
-            declaration_required=False,
+            max_package_quantity=Decimal("35"),
+            permitted_packagings=(),
+            declaration_required=True,
         ),
     ),
 )
