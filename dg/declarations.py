@@ -29,6 +29,7 @@ class DeclarationData:
     shipper: Party
     consignee: Party
     air_waybill_number: str | None
+    shippers_reference: str | None
     aircraft_limitation: str
     departure_airport: str | None
     destination_airport: str | None
@@ -91,6 +92,7 @@ def build_declaration(report: ValidationReport) -> DeclarationData:
         shipper=shipment.shipper,
         consignee=shipment.consignee,
         air_waybill_number=shipment.air_waybill_number,
+        shippers_reference = shipment.shippers_reference,
         aircraft_limitation=aircraft_limitation,
         departure_airport=shipment.departure_airport,
         destination_airport=shipment.destination_airport,

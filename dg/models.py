@@ -127,13 +127,14 @@ class Package:
         return self.packaging.code
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Party:
     name: str
-    address: str
+    business: str | None = None
+    address: list[str]
 
     def __post_init__(self) -> None:
-        if not self.name.strip() or not self.address.strip():
+        if not self.name.strip() or not any(l.strip() for l in self.address):
             raise ValueError("Party name and address are required")
 
 
@@ -152,6 +153,7 @@ class Shipment:
     shipper: Party | None = None
     consignee: Party | None = None
     air_waybill_number: str | None = None
+    shippers_reference: str | None = None
     departure_airport: str | None = None
     destination_airport: str | None = None
     additional_handling_information: str = ""

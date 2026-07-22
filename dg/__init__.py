@@ -36,12 +36,21 @@ from .validation import (
     validate_shipment,
 )
 
+from .dangerous_goods_declaration import (
+    DangerousGoodsDeclaration,
+    BoxOverflowError,
+    FieldWrapError
+)
+
 __all__ = [
     "AircraftType",
     "BOTTLE_OR_CARTRIDGE_IN_ABSORBENT_MAT_AND_BAG",
+    "BoxOverflowError",
+    "DangerousGoodsDeclaration",
     "DangerousGoodsDefinition",
     "DeclarationData",
     "DeclarationLine",
+    "FieldWrapError",
     "HazardClass",
     "InnerReceptacle",
     "LithiumIonBattery",
