@@ -76,6 +76,8 @@ class ValidationReport:
     @property
     def is_radioactive(self) -> bool:
         """Based on the hazard classes of the shipment lines"""
+        if self.definition is None:
+            return False
         if self.definition.primary_hazard == HazardClass.CLASS_7:
             return True
         for cls in self.definition.subsidiary_hazards:

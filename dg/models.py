@@ -165,6 +165,9 @@ class Shipment:
             raise ValueError("UN number must be between 0001 and 9999")
         if not self.packages:
             raise ValueError("Shipment must contain at least one package")
+        if not self.signatory.strip():
+            raise ValueError("Shipment signatory is required")
+        object.__setattr__(self, "signatory", self.signatory.strip())
         if self.definition_variant is not None:
             variant = self.definition_variant.strip()
             if not variant:

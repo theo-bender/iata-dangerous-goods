@@ -85,13 +85,15 @@ def build_declaration(report: ValidationReport) -> DeclarationData:
     )
 
     aircraft_limitation = report.aircraft_limitation
+    if aircraft_limitation is None:
+        raise ValueError("A declaration requires an aircraft limitation")
     is_radioactive = report.is_radioactive
-    
+
     return DeclarationData(
         shipper=shipment.shipper,
         consignee=shipment.consignee,
         air_waybill_number=shipment.air_waybill_number,
-        shippers_reference = shipment.shippers_reference,
+        shippers_reference=shipment.shippers_reference,
         aircraft_limitation=aircraft_limitation,
         is_radioactive=is_radioactive,
         departure_airport=shipment.departure_airport,

@@ -93,6 +93,7 @@ def shipment(*, inner: str = "1", net: str = "4", **changes) -> Shipment:
             ),
         ),
         "ship_date": date(2026, 7, 9),
+        "signatory": "Test Signatory",
     }
     values.update(changes)
     return Shipment(**values)
@@ -172,8 +173,12 @@ class ValidationTests(unittest.TestCase):
         )
         proposed = shipment(
             net="30",
-            shipper=Party("Example Shipper", "1 Origin Way"),
-            consignee=Party("Example Consignee", "2 Destination Road"),
+            shippers_reference="CARGO-REF",
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(
+                name="Example Consignee",
+                address=["2 Destination Road"],
+            ),
         )
 
         report = validate_shipment(proposed, {(9999, None): definition})
@@ -185,7 +190,10 @@ class ValidationTests(unittest.TestCase):
             TransportMode.CARGO_AIRCRAFT_ONLY,
         )
         self.assertIs(report.aircraft_limitation, AircraftType.CARGO_ONLY)
-        self.assertEqual(declaration.aircraft_limitation, "CARGO AIRCRAFT ONLY")
+        self.assertIs(declaration.aircraft_limitation, AircraftType.CARGO_ONLY)
+        self.assertEqual(declaration.shippers_reference, "CARGO-REF")
+        self.assertEqual(declaration.signatory, "Test Signatory")
+        self.assertEqual(declaration.signatory_date, date(2026, 7, 9))
 
     def test_rejects_expired_regulatory_data(self) -> None:
         report = validate_shipment(
@@ -205,8 +213,11 @@ class ValidationTests(unittest.TestCase):
     def test_builds_structured_declaration_for_required_mode(self) -> None:
         proposed = shipment(
             net="6",
-            shipper=Party("Example Shipper", "1 Origin Way"),
-            consignee=Party("Example Consignee", "2 Destination Road"),
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(
+                name="Example Consignee",
+                address=["2 Destination Road"],
+            ),
         )
         report = validate_shipment(proposed, {(9999, None): DEFINITION})
 
@@ -216,12 +227,48 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(declaration.lines[0].packing_instruction, "999")
         self.assertEqual(
             declaration.aircraft_limitation,
-            "PASSENGER AND CARGO AIRCRAFT",
+            AircraftType.PASSENGER_AND_CARGO,
         )
         self.assertEqual(
             declaration.lines[0].quantity_and_type_of_packing,
-            "1 Fibreboard Box, 6 L",
+            "1 Fibreboard Box x 6 L",
         )
+
+    def test_declaration_reports_radioactive_hazards(self) -> None:
+        for changes in (
+            {"primary_hazard": HazardClass.CLASS_7},
+            {"subsidiary_hazards": (HazardClass.CLASS_7,)},
+        ):
+            with self.subTest(changes=changes):
+                definition = replace(DEFINITION, **changes)
+                proposed = shipment(
+                    net="6",
+                    shipper=Party(
+                        name="Example Shipper",
+                        address=["1 Origin Way"],
+                    ),
+                    consignee=Party(
+                        name="Example Consignee",
+                        address=["2 Destination Road"],
+                    ),
+                )
+
+                report = validate_shipment(
+                    proposed,
+                    {(9999, None): definition},
+                )
+
+                self.assertTrue(report.is_radioactive)
+                self.assertTrue(build_declaration(report).is_radioactive)
+
+    def test_unresolved_definition_is_not_radioactive(self) -> None:
+        report = validate_shipment(shipment(un_number=1234), {})
+
+        self.assertFalse(report.is_radioactive)
+
+    def test_rejects_blank_signatory(self) -> None:
+        with self.assertRaisesRegex(ValueError, "signatory is required"):
+            shipment(signatory="  ")
 
     def test_rejects_declaration_for_exempt_mode(self) -> None:
         report = validate_shipment(shipment(), {(9999, None): DEFINITION})
@@ -243,8 +290,11 @@ class ValidationTests(unittest.TestCase):
         proposed = shipment(
             net="6",
             packages=(Package(packaging=packaging, net_quantity=Decimal("6")),),
-            shipper=Party("Example Shipper", "1 Origin Way"),
-            consignee=Party("Example Consignee", "2 Destination Road"),
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(
+                name="Example Consignee",
+                address=["2 Destination Road"],
+            ),
         )
         report = validate_shipment(proposed, {(9999, None): definition})
 
@@ -264,8 +314,11 @@ class ValidationTests(unittest.TestCase):
         proposed = shipment(
             net="6",
             technical_names=(" chemical A ", "chemical B"),
-            shipper=Party("Example Shipper", "1 Origin Way"),
-            consignee=Party("Example Consignee", "2 Destination Road"),
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(
+                name="Example Consignee",
+                address=["2 Destination Road"],
+            ),
         )
         report = validate_shipment(proposed, {(9999, None): definition})
 

@@ -31,7 +31,9 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "reportlab>=5.0.0",
+]
 
 [project.optional-dependencies]
 dev = [

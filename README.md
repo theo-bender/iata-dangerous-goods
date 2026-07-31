@@ -12,8 +12,8 @@ requires a Shipper's Declaration.
 
 ## Installation
 
-`iata-dangerous-goods` requires Python 3.11 or later and has no runtime
-dependencies.
+`iata-dangerous-goods` requires Python 3.11 or later. ReportLab is installed as
+a runtime dependency for rendering Shipper's Declaration PDFs.
 
 ```console
 python -m pip install iata-dangerous-goods
@@ -121,7 +121,7 @@ configuration against the current DGR.
 `PackagingDefinition.dgd_packaging_description` stores the controlled package
 type wording required in the declaration's Quantity and Type of Packing field.
 For example, the 4G box configurations use `Fibreboard Box`, producing output
-such as `1 Fibreboard Box, 4 L`. Friendly display names and free-text packaging
+such as `1 Fibreboard Box x 4 L`. Friendly display names and free-text packaging
 instructions are never substituted into this DGD field. Declaration generation
 stops if the selected packaging has no verified DGD wording.
 
@@ -138,6 +138,22 @@ Shipment(
 
 The declaration builder renders these immediately after the base proper
 shipping name as `PROPER SHIPPING NAME (chemical A, chemical B)`.
+
+Build the declaration PDF in memory when it is ready to return from an API,
+attach to a message, or store in an object store:
+
+```python
+from dg import DangerousGoodsDeclaration
+
+pdf_bytes = DangerousGoodsDeclaration(declaration).build()
+```
+
+Passing a filename remains available when an explicit file copy is useful.
+The same PDF bytes are returned in either case:
+
+```python
+pdf_bytes = DangerousGoodsDeclaration(declaration).build("declaration.pdf")
+```
 
 ## Run the tests
 
