@@ -9,6 +9,7 @@ from reportlab.pdfgen import canvas
 from dg import (
     DeclarationData,
     Party,
+    AircraftType,
 )
 
 from datetime import datetime, date
@@ -110,8 +111,17 @@ class DangerousGoodsDeclaration:
         self.pagesize = letter
         self.left_margin = 0.875 * inch
         self.right_margin = 0.875 * inch
-        self.top_margin = 5.05 * inch
+        self.top_margin = 5.5 * inch
         self.bottom_margin = 1.875 * inch
+
+        #Column widths
+        self.un_col_width = 1/9
+        self.psn_col_width = 2/9
+        self.class_col_width = 1/9
+        self.pg_col_width = 1/9
+        self.desc_col_width = 2/9
+        self.pi_col_width = 1/9
+        self.auth_col_width = 1/9
 
         # Styles for the top title
         self.header_title_style = ParagraphStyle(
@@ -150,6 +160,45 @@ class DangerousGoodsDeclaration:
             fontSize=10,
             leading=11,
             textColor=colors.black,
+        )
+
+        self.italic_text_style = ParagraphStyle(
+            "ItalicBody",
+            parent=styles["Normal"],
+            fontName="Helvetica-Oblique",
+            fontSize=6,
+            leading=8,
+            textColor=colors.black,
+        )
+
+        self.enum_style = ParagraphStyle(
+            "EnumBody",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=7,
+            leading=8,
+            textColor=colors.black,
+            alignment=TA_CENTER
+        )
+
+        self.centered_subhead_style = ParagraphStyle(
+            "CenteredSubhead",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=11,
+            textColor=colors.black,
+            alignment=TA_CENTER
+        )
+
+        self.centered_colhead_style = ParagraphStyle(
+            "CenteredColhead",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8,
+            leading=9,
+            textColor=colors.black,
+            alignment=TA_CENTER
         )
     
     def build(
@@ -295,6 +344,325 @@ class DangerousGoodsDeclaration:
 
             box_canvas.restoreState()
 
+        def draw_transport_details_box(box_canvas, box_left, box_bottom, box_width, box_height):
+            """
+            Draws the transport details box which contains aircraft type, airport of departure, and airport of destination
+            """
+            box_canvas.saveState()
+            
+            x_padding = 4
+            y_padding = 2
+            content_width = box_width - (2 * x_padding)
+            content_top = box_bottom + box_height - y_padding
+            content_height = box_height - 2 * y_padding
+
+            # Draw content top-down
+            cursor_y = content_top - y_padding
+
+            # Draw box border
+            box_canvas.rect(box_left, box_bottom, box_width, box_height, stroke=1, fill=0)
+
+            #Copy count statement
+            copies_paragraph, copies_paragraph_height = measure_paragraph(
+                "Two completed and signed copies of this Declaration must be handed to the operator.", 
+                self.italic_text_style, 
+                content_width
+            )
+            cursor_y -= copies_paragraph_height
+            copies_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+            cursor_y -= y_padding
+
+            # Draw line under copies statement
+            box_canvas.line(box_left, cursor_y, box_width+box_left, cursor_y)
+
+            #TRANSPORT DETAILS subheader
+            subheader_paragraph, subheader_paragraph_height = measure_paragraph(
+                "TRANSPORT DETAILS", 
+                self.box_title_style, 
+                content_width
+            )
+            cursor_y -= subheader_paragraph_height
+            subheader_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+            cursor_y -= y_padding * 2
+
+            # Draw line under copies statement
+            box_canvas.line(box_left, cursor_y, box_width+box_left, cursor_y)
+
+            sub_box_width = box_width/2
+            #Draw vertical line seperating halves of box
+            box_canvas.line(box_left+sub_box_width, cursor_y, box_left+sub_box_width, cursor_y - 1*inch)
+            box_canvas.line(box_left, cursor_y - 1*inch, box_width+box_left, cursor_y - 1*inch)
+
+            #Aircraft type
+            actype_label_paragraph, actype_label_paragraph_height = measure_paragraph(
+                "This shipment is within the limitations prescribed for:<br/><br/>(delete non-applicable)", 
+                self.address_text_style, 
+                content_width/2
+            )
+            left_side_cursor_y = cursor_y - actype_label_paragraph_height
+            actype_label_paragraph.drawOn(box_canvas, box_left + x_padding, left_side_cursor_y)
+            left_side_cursor_y -= y_padding*2
+
+            if self.declaration_data.aircraft_limitation == AircraftType.PASSENGER_AND_CARGO:
+                pca_fill = False
+                cao_fill = True
+            elif self.declaration_data.aircraft_limitation == AircraftType.CARGO_ONLY:
+                pca_fill = True
+                cao_fill = False
+            else:
+                raise ValueError('Aircraft type must be PASSENGER_AND_CARGO or CARGO_ONLY')
+
+            pca_paragraph, pca_paragraph_height = measure_paragraph(
+                "PASSENGER AND CARGO AIRCRAFT", 
+                self.enum_style, 
+                sub_box_width/2 - x_padding*2
+            )
+            cao_paragraph, cao_paragraph_height = measure_paragraph(
+                "CARGO AIRCRAFT ONLY", 
+                self.enum_style, 
+                sub_box_width/2 - x_padding*2
+            )
+
+            pca_y = left_side_cursor_y - pca_paragraph_height
+            cao_y = pca_y
+            pca_paragraph.drawOn(box_canvas, box_left + x_padding, pca_y)
+            cao_paragraph.drawOn(box_canvas, sub_box_width + x_padding, cao_y)
+
+            #Boxes around aircraft type enums
+            box_canvas.rect(box_left, pca_y - y_padding, sub_box_width/2, pca_paragraph_height + y_padding*2, stroke=1, fill=pca_fill)
+            box_canvas.rect(box_left+sub_box_width/2, cao_y-y_padding, sub_box_width/2, cao_paragraph_height + y_padding*2, stroke=1, fill=cao_fill)
+
+            #Airport of departure
+            aod_header_paragraph, aod_header_paragraph_height = measure_paragraph(
+                "Airport of Departure (optional)",
+                self.address_text_style, 
+                content_width/2
+            )
+            right_side_cursor_y = cursor_y - aod_header_paragraph_height
+            aod_header_paragraph.drawOn(box_canvas, box_left + sub_box_width + x_padding, right_side_cursor_y)
+            right_side_cursor_y -= y_padding*2
+
+            if self.declaration_data.departure_airport:
+                aod_paragraph, aod_paragraph_height = measure_paragraph(
+                    self.declaration_data.departure_airport, 
+                    self.address_text_style, 
+                    content_width/2
+                )
+
+                available_height = right_side_cursor_y - (cursor_y - 1*inch)
+                if aod_paragraph_height > available_height:
+                    raise BoxOverflowError(
+                        box_name="Airport of departure",
+                        required=aod_paragraph_height,
+                        available=available_height,
+                    )
+                
+                aod_paragraph.drawOn(box_canvas, box_left + sub_box_width + x_padding, right_side_cursor_y - aod_paragraph_height)
+
+            cursor_y = cursor_y - 1*inch
+
+            #Airport of destination
+            aod_header_paragraph, aod_header_paragraph_height = measure_paragraph(
+                "Airport of Destination (optional)",
+                self.address_text_style, 
+                content_width
+            )
+            cursor_y -= aod_header_paragraph_height
+            aod_header_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+            cursor_y -= y_padding*2
+
+            if self.declaration_data.destination_airport:
+                aod_paragraph, aod_paragraph_height = measure_paragraph(
+                    self.declaration_data.destination_airport, 
+                    self.address_text_style, 
+                    content_width
+                )
+
+                available_height = cursor_y - box_bottom
+                if aod_paragraph_height > available_height:
+                    raise BoxOverflowError(
+                        box_name="Airport of destination",
+                        required=aod_paragraph_height,
+                        available=available_height,
+                    )
+                
+                aod_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y - aod_paragraph_height)
+
+            box_canvas.restoreState()
+
+        def draw_shipment_type_box(box_canvas, box_left, box_bottom, box_width, box_height):
+            """
+            Draws shipment type box which contains a warning header, and the shipment type (radioactive/non-radioactive)
+            """
+            box_canvas.saveState()
+                        
+            x_padding = 4
+            y_padding = 2
+            content_width = box_width - (2 * x_padding)
+            content_top = box_bottom + box_height - y_padding
+            content_height = box_height - 2 * y_padding
+
+            # Draw content top-down
+            cursor_y = content_top - y_padding
+
+            # Draw box border
+            box_canvas.rect(box_left, box_bottom, box_width, box_height, stroke=1, fill=0)
+
+            #Warning subheader
+            subheader_paragraph, subheader_paragraph_height = measure_paragraph(
+                "WARNING<br/><br/>Failure to comply in all respects with the applicable Dangerous Goods Regulations may be in breach of the applicable law, subject to legal penalties.", 
+                self.box_title_style, 
+                content_width
+            )
+            cursor_y -= subheader_paragraph_height
+            subheader_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+            cursor_y -= 0.695*inch
+
+            # Draw line under warning statement
+            box_canvas.line(box_left, cursor_y, box_width+box_left, cursor_y)
+
+            cursor_y -= y_padding*2
+
+            #Shipment type
+            type_label_paragraph, type_label_paragraph_height = measure_paragraph(
+                "Shipment type: (delete non-applicable)", 
+                self.address_text_style, 
+                content_width
+            )
+            cursor_y -= type_label_paragraph_height
+            type_label_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+            cursor_y -= y_padding*3
+
+
+            nr_paragraph, nr_paragraph_height = measure_paragraph(
+                "NON-RADIOACTIVE", 
+                self.enum_style, 
+                content_width/2
+            )
+            cursor_y -= nr_paragraph_height
+            nr_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+
+            rr_paragraph, rr_paragraph_height = measure_paragraph(
+                "RADIOACTIVE", 
+                self.enum_style, 
+                content_width/2
+            )
+            rr_paragraph.drawOn(box_canvas, box_left + (box_width/2) + x_padding, cursor_y)
+
+            #Boxes around shipment type enums
+            box_canvas.rect(box_left, cursor_y - y_padding, box_width/2, nr_paragraph_height + y_padding*2, stroke=1, fill=self.declaration_data.is_radioactive)
+            box_canvas.rect(box_left+box_width/2, cursor_y-y_padding, box_width/2, rr_paragraph_height + y_padding*2, stroke=1, fill=not self.declaration_data.is_radioactive)
+
+            box_canvas.restoreState()
+
+        def draw_column_headers(box_canvas, box_left, box_bottom, box_width, box_height):
+            """
+            This draws the nature and quantity of dangerous goods headers, which appear on every page
+            """
+
+            box_canvas.saveState()
+                                    
+            x_padding = 4
+            y_padding = 2
+            content_width = box_width - (2 * x_padding)
+            content_top = box_bottom + box_height - y_padding
+            content_height = box_height - 2 * y_padding
+
+            # Draw content top-down
+            cursor_y = content_top
+
+            # Draw box border
+            box_canvas.rect(box_left, box_bottom, box_width, box_height, stroke=1, fill=0)
+
+            #Nature and quantity of dangerous goods subheader
+            subheader_paragraph, subheader_paragraph_height = measure_paragraph(
+                "NATURE AND QUANTITY OF DANGEROUS GOODS", 
+                self.header_title_style, 
+                content_width
+            )
+            cursor_y -= subheader_paragraph_height
+            subheader_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+            cursor_y -= y_padding*2
+
+            # Draw line under warning statement
+            box_canvas.line(box_left, cursor_y, box_width+box_left, cursor_y)
+            top_line_y = cursor_y
+
+            cursor_y -= y_padding
+
+            #Dangerous goods identification subheader
+            dg_subheader_paragraph, dg_subheader_paragraph_height = measure_paragraph(
+                "Dangerous Goods Identification", 
+                self.centered_subhead_style, 
+                content_width * (self.un_col_width + self.psn_col_width + self.class_col_width + self.pg_col_width)
+            )
+            cursor_y -= dg_subheader_paragraph_height
+            dg_subheader_paragraph.drawOn(box_canvas, box_left, cursor_y)
+            cursor_y -= y_padding
+
+            box_canvas.line(box_left, cursor_y, box_width+box_left, cursor_y)
+
+            #Box column headers
+            un_paragraph, un_paragraph_height = measure_paragraph(
+                "UN or ID No.", 
+                self.centered_colhead_style, 
+                box_width * self.un_col_width
+            )
+            psn_paragraph, psn_paragraph_height = measure_paragraph(
+                "Proper Shipping Name", 
+                self.centered_colhead_style, 
+                box_width * self.psn_col_width
+            )
+            class_paragraph, class_paragraph_height = measure_paragraph(
+                "Class or Division (subsidiary hazard)", 
+                self.centered_colhead_style, 
+                box_width * self.class_col_width
+            )
+            pg_paragraph, pg_paragraph_height = measure_paragraph(
+                "Packing Group", 
+                self.centered_colhead_style, 
+                box_width * self.pg_col_width
+            )
+            desc_paragraph, desc_paragraph_height = measure_paragraph(
+                "Quantity and Type of Packing", 
+                self.centered_colhead_style, 
+                box_width * self.desc_col_width
+            )
+            pi_paragraph, pi_paragraph_height = measure_paragraph(
+                "Packing Inst.", 
+                self.centered_colhead_style, 
+                box_width * self.pi_col_width
+            )
+            auth_paragraph, auth_paragraph_height = measure_paragraph(
+                "Auth.", 
+                self.centered_colhead_style, 
+                box_width * self.auth_col_width
+            )
+            tallest_col = max(un_paragraph_height, psn_paragraph_height, class_paragraph_height, pg_paragraph_height, desc_paragraph_height, pi_paragraph_height, auth_paragraph_height)
+            
+            cursor_x = box_left
+            un_paragraph.drawOn(box_canvas, cursor_x, cursor_y-un_paragraph_height)
+            cursor_x += box_width * self.un_col_width
+            box_canvas.line(cursor_x, cursor_y - tallest_col, cursor_x, cursor_y)
+            psn_paragraph.drawOn(box_canvas, cursor_x, cursor_y-psn_paragraph_height)
+            cursor_x += box_width * self.psn_col_width
+            box_canvas.line(cursor_x, cursor_y - tallest_col, cursor_x, cursor_y)
+            class_paragraph.drawOn(box_canvas, cursor_x, cursor_y-class_paragraph_height)
+            cursor_x += box_width * self.class_col_width
+            box_canvas.line(cursor_x, cursor_y - tallest_col, cursor_x, cursor_y)
+            pg_paragraph.drawOn(box_canvas, cursor_x, cursor_y-pg_paragraph_height)
+            cursor_x += box_width * self.pg_col_width
+            box_canvas.line(cursor_x, cursor_y - tallest_col, cursor_x, top_line_y)
+            desc_paragraph.drawOn(box_canvas, cursor_x, cursor_y-desc_paragraph_height)
+            cursor_x += box_width * self.desc_col_width
+            box_canvas.line(cursor_x, cursor_y - tallest_col, cursor_x, top_line_y)
+            pi_paragraph.drawOn(box_canvas, cursor_x, cursor_y-pi_paragraph_height)
+            cursor_x += box_width * self.pi_col_width
+            box_canvas.line(cursor_x, cursor_y - tallest_col, cursor_x, top_line_y)
+            auth_paragraph.drawOn(box_canvas, cursor_x, cursor_y-auth_paragraph_height)
+
+            box_canvas.restoreState()
+
         def draw_header(header_canvas, doc):
             header_canvas.saveState()
 
@@ -317,6 +685,8 @@ class DangerousGoodsDeclaration:
 
             r1_box_height = 1 * inch
             r2_box_height = 1 * inch
+            r3_box_height = 2 * inch
+            r4_box_height = 1 * inch
 
             gap_between_boxes = 0 * inch
             box_width = (doc.width - gap_between_boxes) / 2
@@ -325,7 +695,9 @@ class DangerousGoodsDeclaration:
             box_right = page_left + box_width
 
             r1_box_bottom = r1_box_top - r1_box_height
-            r2_box_bottom = r1_box_bottom - r1_box_height
+            r2_box_bottom = r1_box_bottom - r2_box_height
+            r3_box_bottom = r2_box_bottom - r3_box_height
+            r4_box_bottom = r3_box_bottom - r4_box_height
 
             draw_address_box(
                 header_canvas,
@@ -355,6 +727,30 @@ class DangerousGoodsDeclaration:
                 r2_box_bottom,
                 box_width,
                 r2_box_height
+            )
+
+            draw_transport_details_box(
+                header_canvas,
+                box_left,
+                r3_box_bottom,
+                box_width,
+                r3_box_height
+            )
+
+            draw_shipment_type_box(
+                header_canvas,
+                box_right,
+                r3_box_bottom,
+                box_width,
+                r3_box_height
+            )
+
+            draw_column_headers(
+                header_canvas,
+                box_left,
+                r4_box_bottom,
+                box_width*2,
+                r4_box_height
             )
 
             header_canvas.restoreState()

@@ -11,6 +11,7 @@ from .models import (
     PackingInstructionSection,
     Shipment,
     TransportMode,
+    HazardClass,
 )
 from .regulations import (
     DangerousGoodsDefinition,
@@ -72,6 +73,15 @@ class ValidationReport:
             return AircraftType.CARGO_ONLY
         return AircraftType.PASSENGER_AND_CARGO
 
+    @property
+    def is_radioactive(self) -> bool:
+        """Based on the hazard classes of the shipment lines"""
+        if self.definition.primary_hazard == HazardClass.CLASS_7:
+            return True
+        for cls in self.definition.subsidiary_hazards:
+            if cls == HazardClass.CLASS_7:
+                return True
+        return False
 
 MODE_PREFERENCE = (
     TransportMode.DE_MINIMIS,

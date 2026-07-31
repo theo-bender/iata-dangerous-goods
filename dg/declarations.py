@@ -30,7 +30,8 @@ class DeclarationData:
     consignee: Party
     air_waybill_number: str | None
     shippers_reference: str | None
-    aircraft_limitation: str
+    aircraft_limitation: AircraftType
+    is_radioactive: bool
     departure_airport: str | None
     destination_airport: str | None
     lines: tuple[DeclarationLine, ...]
@@ -80,20 +81,16 @@ def build_declaration(report: ValidationReport) -> DeclarationData:
         packing_instruction=report.selected_rule.packing_instruction,
     )
 
-    report_aircraft_limitation = report.aircraft_limitation
-    if report_aircraft_limitation is None:
-        raise ValueError("A declaration requires an aircraft limitation")
-    aircraft_limitation = (
-        "PASSENGER AND CARGO AIRCRAFT"
-        if report_aircraft_limitation is AircraftType.PASSENGER_AND_CARGO
-        else "CARGO AIRCRAFT ONLY"
-    )
+    aircraft_limitation = report.aircraft_limitation
+    is_radioactive = report.is_radioactive
+    
     return DeclarationData(
         shipper=shipment.shipper,
         consignee=shipment.consignee,
         air_waybill_number=shipment.air_waybill_number,
         shippers_reference = shipment.shippers_reference,
         aircraft_limitation=aircraft_limitation,
+        is_radioactive=is_radioactive,
         departure_airport=shipment.departure_airport,
         destination_airport=shipment.destination_airport,
         lines=(line,),
