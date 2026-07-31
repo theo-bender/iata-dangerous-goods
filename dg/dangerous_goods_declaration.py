@@ -1,6 +1,6 @@
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
-from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer
+from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Paragraph, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
@@ -8,11 +8,13 @@ from reportlab.pdfgen import canvas
 
 from dg import (
     DeclarationData,
+    DeclarationLine,
     Party,
     AircraftType,
 )
 
 from datetime import datetime, date
+from dataclasses import dataclass
 
 styles = getSampleStyleSheet()
 PAGE_W, PAGE_H = letter
@@ -71,6 +73,25 @@ class FieldWrapError(DocumentLayoutError):
         self.field_name = field_name
         self.value = value
 
+@dataclass(frozen=True)
+class HeaderLayout:
+    title_top: float
+    title_height: float
+
+    r1_top: float
+    r1_bottom: float
+
+    r2_top: float
+    r2_bottom: float
+
+    r3_top: float
+    r3_bottom: float
+
+    r4_top: float
+    r4_bottom: float
+
+    total_height: float
+
 class DangerousGoodsCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -108,22 +129,7 @@ class DangerousGoodsDeclaration:
 
         self.declaration_data = declaration_data
 
-        self.pagesize = letter
-        self.left_margin = 0.875 * inch
-        self.right_margin = 0.875 * inch
-        self.top_margin = 5.5 * inch
-        self.bottom_margin = 1.875 * inch
-
-        #Column widths
-        self.un_col_width = 1/9
-        self.psn_col_width = 2/9
-        self.class_col_width = 1/9
-        self.pg_col_width = 1/9
-        self.desc_col_width = 2/9
-        self.pi_col_width = 1/9
-        self.auth_col_width = 1/9
-
-        # Styles for the top title
+        # Styles
         self.header_title_style = ParagraphStyle(
             "Helvetica12Bold",
             fontName="Helvetica-Bold",
@@ -199,6 +205,85 @@ class DangerousGoodsDeclaration:
             leading=9,
             textColor=colors.black,
             alignment=TA_CENTER
+        )
+
+        self.table_center_style = ParagraphStyle(
+            "TableCenter",
+            fontName="Courier",
+            parent=self.address_text_style,
+            alignment=TA_CENTER,
+        )
+
+        self.table_left_style = ParagraphStyle(
+            "TableLeft",
+            fontName="Courier",
+            parent=self.address_text_style,
+            alignment=TA_LEFT,
+        )
+
+        self.pagesize = letter
+        self.left_margin = 0.875 * inch
+        self.right_margin = 0.875 * inch
+
+        dummy_doc_width = (
+            PAGE_W
+            - self.left_margin
+            - self.right_margin
+        )
+        layout = self.header_layout(dummy_doc_width)
+
+        self.top_margin = layout.total_height
+        self.bottom_margin = 2.375 * inch
+
+        #Column widths
+        self.un_col_width = 0.75/9
+        self.psn_col_width = 2.25/9
+        self.class_col_width = 1/9
+        self.pg_col_width = 0.75/9
+        self.desc_col_width = 3.15/9
+        self.pi_col_width = 0.6/9
+        self.auth_col_width = 0.5/9
+
+    def header_layout(self, doc_width: float) -> HeaderLayout:
+        title_top = PAGE_H - 0.5 * inch
+
+        title = Paragraph(
+            "SHIPPER'S DECLARATION FOR DANGEROUS GOODS",
+            self.header_title_style,
+        )
+        _, title_height = title.wrap(doc_width, 1000)
+
+        gap_below_title = 0
+
+        r1_height = 1 * inch
+        r2_height = 1 * inch
+        r3_height = 2 * inch
+        r4_height = 1 * inch
+
+        r1_top = title_top - title_height - gap_below_title
+        r1_bottom = r1_top - r1_height
+
+        r2_top = r1_bottom
+        r2_bottom = r2_top - r2_height
+
+        r3_top = r2_bottom
+        r3_bottom = r3_top - r3_height
+
+        r4_top = r3_bottom
+        r4_bottom = r4_top - r4_height
+
+        return HeaderLayout(
+            title_top=title_top,
+            title_height=title_height,
+            r1_top=r1_top,
+            r1_bottom=r1_bottom,
+            r2_top=r2_top,
+            r2_bottom=r2_bottom,
+            r3_top=r3_top,
+            r3_bottom=r3_bottom,
+            r4_top=r4_top,
+            r4_bottom=r4_bottom,
+            total_height=PAGE_H - r4_bottom,
         )
     
     def build(
@@ -663,52 +748,187 @@ class DangerousGoodsDeclaration:
 
             box_canvas.restoreState()
 
+        def draw_additional_handling_box(box_canvas, box_left, box_bottom, box_width, box_height):
+            """
+            This draws the additional handling statement
+            """
+
+            box_canvas.saveState()
+                                    
+            x_padding = 4
+            y_padding = 2
+            content_width = box_width - (2 * x_padding)
+            content_top = box_bottom + box_height - y_padding
+            content_height = box_height - 2 * y_padding
+
+            # Draw content top-down
+            cursor_y = content_top
+
+            # Draw box border
+            box_canvas.rect(box_left, box_bottom, box_width, box_height, stroke=1, fill=0)
+
+            # subheader
+            subheader_paragraph, subheader_paragraph_height = measure_paragraph(
+                "Additional Handling Information", 
+                self.box_title_style, 
+                content_width
+            )
+            cursor_y -= subheader_paragraph_height
+            subheader_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y)
+            cursor_y -= y_padding
+
+            if self.declaration_data.additional_handling_information:
+                hi_paragraph, hi_paragraph_height = measure_paragraph(
+                    self.declaration_data.additional_handling_information, 
+                    self.address_text_style, 
+                    content_width
+                )
+
+                available_height = cursor_y - box_bottom
+                if hi_paragraph_height > available_height:
+                    raise BoxOverflowError(
+                        box_name="Additional handling information",
+                        required=hi_paragraph_height,
+                        available=available_height,
+                    )
+                
+                hi_paragraph.drawOn(box_canvas, box_left + x_padding, cursor_y - hi_paragraph_height)
+
+            box_canvas.restoreState()
+
+        def draw_signature_box(box_canvas, box_left, box_bottom, box_width, box_height):
+            """
+            This draws the signature box at the bottom of the page
+            """
+
+            box_canvas.saveState()
+                                    
+            x_padding = 4
+            y_padding = 2
+            content_width = box_width - (2 * x_padding)
+            content_top = box_bottom + box_height - y_padding
+            content_height = box_height - 2 * y_padding
+
+            left_side_start = box_left
+            right_side_start = box_left + (box_width * (2/3))
+
+            # Draw content top-down
+            cursor_y = content_top
+            left_cursor_y = cursor_y
+            right_cursor_y = cursor_y
+
+            # Draw box border
+            box_canvas.rect(box_left, box_bottom, box_width, box_height, stroke=1, fill=0)
+            #Draw vertical line
+            box_canvas.line(right_side_start, box_bottom, right_side_start, box_bottom + box_height)
+
+            # declaration statement
+            dec_paragraph, dec_paragraph_height = measure_paragraph(
+                "I hereby declare that the contents of this consignment are fully and accurately described above by the proper shipping name, and are classified, packaged, marked and labelled/placarded, and are in all respects in proper condition for transport according to applicable international and national governmental regulations. I declare that all of the applicable air transport requirements have been met.", 
+                self.address_text_style, 
+                content_width * (2/3)
+            )
+            left_cursor_y -= dec_paragraph_height
+            dec_paragraph.drawOn(box_canvas, left_side_start + x_padding, left_cursor_y)
+            left_cursor_y -= y_padding
+
+
+            #Signatory name
+            sigheader_paragraph, sigheader_paragraph_height = measure_paragraph(
+                "Name of Signatory", 
+                self.box_title_style, 
+                content_width * (1/3)
+            )
+            right_cursor_y -= sigheader_paragraph_height
+            sigheader_paragraph.drawOn(box_canvas, right_side_start + x_padding, right_cursor_y)
+            right_cursor_y -= y_padding
+
+            sign_paragraph, sign_paragraph_height = measure_paragraph(
+                self.declaration_data.signatory, 
+                self.address_text_style, 
+                content_width * (1/3)
+            )
+            right_cursor_y -= sign_paragraph_height
+            if sign_paragraph_height > self.address_text_style.leading * 1.2: # Allow a little tolerance for font metrics
+                raise FieldWrapError(
+                    field_name='Signatory Name',
+                    value=self.declaration_data.signatory,
+                )
+            sign_paragraph.drawOn(box_canvas, right_side_start + x_padding, right_cursor_y)
+
+
+            #Signatory date
+            sigdateheader_paragraph, sigdateheader_paragraph_height = measure_paragraph(
+                "Date", 
+                self.box_title_style, 
+                content_width * (1/3)
+            )
+            right_cursor_y -= sigdateheader_paragraph_height
+            sigdateheader_paragraph.drawOn(box_canvas, right_side_start + x_padding, right_cursor_y)
+            right_cursor_y -= y_padding
+
+            sigdate_paragraph, sigdate_paragraph_height = measure_paragraph(
+                self.declaration_data.signatory_date.strftime("%Y-%m-%d"), #Format date like 2026-07-31
+                self.address_text_style, 
+                content_width * (1/3)
+            )
+            right_cursor_y -= sigdate_paragraph_height
+            if sigdate_paragraph_height > self.address_text_style.leading * 1.2: # Allow a little tolerance for font metrics
+                raise FieldWrapError(
+                    field_name='Signatory Date',
+                    value=self.declaration_data.signatory_date.strftime("%Y-%m-%d"),
+                )
+            sigdate_paragraph.drawOn(box_canvas, right_side_start + x_padding, right_cursor_y)
+
+            #Signature label
+            siglabel_paragraph, siglabel_paragraph_height = measure_paragraph(
+                "Signature<br/>(See warning above)", 
+                self.box_title_style, 
+                content_width * (1/3)
+            )
+            right_cursor_y -= siglabel_paragraph_height
+            siglabel_paragraph.drawOn(box_canvas, right_side_start + x_padding, right_cursor_y)
+            right_cursor_y -= y_padding
+
+            box_canvas.restoreState()
+
+
         def draw_header(header_canvas, doc):
-            header_canvas.saveState()
+            layout = self.header_layout(doc.width)
 
             page_left = doc.leftMargin
             page_right = PAGE_W - doc.rightMargin
+            box_width = doc.width / 2
+
+            box_left = page_left
+            box_right = page_left + box_width
 
             # Big top title
-            header_title_top = PAGE_H - 0.4 * inch
+            header_title_top = PAGE_H - 0.5 * inch
 
             p = Paragraph(
                 "SHIPPER'S DECLARATION FOR DANGEROUS GOODS",
                 self.header_title_style,
             )
             _, header_title_height = p.wrap(page_right - page_left, 1000)
-            p.drawOn(header_canvas, page_left, header_title_top - header_title_height)
-
-            # Boxes start directly under the title
-            gap_below_title = 0 * inch
-            r1_box_top = header_title_top - header_title_height - gap_below_title
-
-            r1_box_height = 1 * inch
-            r2_box_height = 1 * inch
-            r3_box_height = 2 * inch
-            r4_box_height = 1 * inch
-
-            gap_between_boxes = 0 * inch
-            box_width = (doc.width - gap_between_boxes) / 2
-
-            box_left = page_left
-            box_right = page_left + box_width
-
-            r1_box_bottom = r1_box_top - r1_box_height
-            r2_box_bottom = r1_box_bottom - r2_box_height
-            r3_box_bottom = r2_box_bottom - r3_box_height
-            r4_box_bottom = r3_box_bottom - r4_box_height
+            p.drawOn(header_canvas, page_left, layout.title_top - layout.title_height)
 
             draw_address_box(
                 header_canvas,
-                box_left, r1_box_bottom, box_width, r1_box_height,
+                box_left, 
+                layout.r1_bottom, 
+                box_width, 
+                layout.r1_top - layout.r1_bottom,
                 "Shipper",
                 self.declaration_data.shipper,
             )
 
             draw_address_box(
                 header_canvas,
-                box_left, r2_box_bottom, box_width, r1_box_height,
+                box_left, 
+                layout.r2_bottom, 
+                box_width, 
+                layout.r2_top - layout.r2_bottom,
                 "Consignee",
                 self.declaration_data.consignee,
             )
@@ -716,50 +936,177 @@ class DangerousGoodsDeclaration:
             draw_waybill_number_box(
                 header_canvas,
                 box_right,
-                r1_box_bottom,
+                layout.r1_bottom,
                 box_width,
-                r1_box_height
+                layout.r1_top - layout.r1_bottom
             )
 
             draw_fx18_box(
                 header_canvas,
                 box_right,
-                r2_box_bottom,
+                layout.r2_bottom,
                 box_width,
-                r2_box_height
+                layout.r2_top - layout.r2_bottom
             )
 
             draw_transport_details_box(
                 header_canvas,
                 box_left,
-                r3_box_bottom,
+                layout.r3_bottom,
                 box_width,
-                r3_box_height
+                layout.r3_top - layout.r3_bottom
             )
 
             draw_shipment_type_box(
                 header_canvas,
                 box_right,
-                r3_box_bottom,
+                layout.r3_bottom,
                 box_width,
-                r3_box_height
+                layout.r3_top - layout.r3_bottom
             )
 
             draw_column_headers(
                 header_canvas,
                 box_left,
-                r4_box_bottom,
+                layout.r4_bottom,
                 box_width*2,
-                r4_box_height
+                layout.r4_top - layout.r4_bottom
             )
 
-            header_canvas.restoreState()
+        def draw_footer(footer_canvas, doc):
 
-        def build_story():
+            page_left = doc.leftMargin
+            page_right = PAGE_W - doc.rightMargin
+
+            footer_y = doc.bottomMargin
+
+            gap_below_title = 0 * inch
+            r1_box_top = footer_y - gap_below_title
+
+            r1_box_height = 0.6 * inch
+            r2_box_height = 1.275 * inch
+
+            gap_between_boxes = 0 * inch
+
+            r1_box_bottom = r1_box_top - r1_box_height
+            r2_box_bottom = r1_box_bottom - r2_box_height
+
+            draw_additional_handling_box(
+                footer_canvas,
+                page_left,
+                r1_box_bottom,
+                doc.width,
+                r1_box_height
+            )
+
+            draw_signature_box(
+                footer_canvas,
+                page_left,
+                r2_box_bottom,
+                doc.width,
+                r2_box_height
+            )
+
+        def draw_story_vertical_rules(page_canvas, doc):
+            page_canvas.saveState()
+
+            x_left = doc.leftMargin
+            x_right = doc.leftMargin + doc.width
+            y_bottom = doc.bottomMargin
+            y_top = PAGE_H - doc.topMargin
+
+            widths = [
+                doc.width * self.un_col_width,
+                doc.width * self.psn_col_width,
+                doc.width * self.class_col_width,
+                doc.width * self.pg_col_width,
+                doc.width * self.desc_col_width,
+                doc.width * self.pi_col_width,
+                doc.width * self.auth_col_width,
+            ]
+
+            # Left outer border
+            page_canvas.line(x_left, y_bottom, x_left, y_top)
+
+            # Internal separators
+            x = x_left
+            for w in widths[:-1]:
+                x += w
+                page_canvas.line(x, y_bottom, x, y_top)
+
+            # Right outer border
+            page_canvas.line(x_right, y_bottom, x_right, y_top)
+
+            page_canvas.restoreState()
+
+        def draw_page(page_canvas, doc):
+            draw_header(page_canvas, doc)
+            draw_story_vertical_rules(page_canvas, doc)
+            draw_footer(page_canvas, doc) 
+
+        def build_story(doc):
             story = []
-            for i in range(40):
-                story.append(Paragraph(f"Body paragraph {i + 1}.", styles["BodyText"]))
-                story.append(Spacer(1, 0.12 * inch))
+            TEXT_COL_PADDING = 3
+
+            def hazard_text(line: DeclarationLine) -> str:
+                if not line.subsidiary_hazards:
+                    return line.class_or_division
+                wrapped = " ".join(f"({hazard})" for hazard in line.subsidiary_hazards)
+                return f"{line.class_or_division} {wrapped}"
+
+            # Keep these widths in the exact same order as the header
+            col_widths = [
+                doc.width * self.un_col_width,
+                doc.width * self.psn_col_width,
+                doc.width * self.class_col_width,
+                doc.width * self.pg_col_width,
+                doc.width * self.desc_col_width,
+                doc.width * self.pi_col_width,
+                doc.width * self.auth_col_width,
+            ]
+
+            rows = []
+            for line in self.declaration_data.lines:
+                rows.append([
+                    Paragraph(line.un_number, self.table_center_style),
+                    Paragraph(line.proper_shipping_name, self.table_left_style),
+                    Paragraph(hazard_text(line), self.table_center_style),
+                    Paragraph(line.packing_group or "", self.table_center_style),
+                    Paragraph(line.quantity_and_type_of_packing, self.table_left_style),
+                    Paragraph(line.packing_instruction, self.table_center_style),
+                    Paragraph(line.authorization or "", self.table_center_style),
+                ])
+
+            table = Table(
+                rows,
+                colWidths=col_widths,
+                repeatRows=0,
+                splitByRow=1,
+                rowHeights=None,
+            )
+
+            table.setStyle(TableStyle([
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ("LEADING", (0, 0), (-1, -1), 8),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+
+                # Default
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+
+                # Padding for left-aligned columns
+                ("LEFTPADDING", (1, 0), (1, -1), TEXT_COL_PADDING),
+                ("RIGHTPADDING", (1, 0), (1, -1), TEXT_COL_PADDING),
+
+                ("LEFTPADDING", (4, 0), (4, -1), TEXT_COL_PADDING),
+                ("RIGHTPADDING", (4, 0), (4, -1), TEXT_COL_PADDING),
+
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]))
+
+            story.append(table)
             return story
 
         if filename:
@@ -790,11 +1137,11 @@ class DangerousGoodsDeclaration:
         template = PageTemplate(
             id="main",
             frames=[frame],
-            onPage=draw_header,
+            onPage=draw_page,
         )
         doc.addPageTemplates([template])
 
-        story = build_story()
+        story = build_story(doc)
         doc.build(
             story,
             canvasmaker=DangerousGoodsCanvas,
@@ -844,6 +1191,7 @@ if __name__ == '__main__':
         shippers_reference='1234',
         departure_airport='SEA',
         destination_airport="PDX",
+        signatory='Person Signing',
         additional_handling_information="Emergency contact: +1 555 555 0100",
     )
 

@@ -145,6 +145,7 @@ class Shipment:
     un_number: int
     packages: tuple[Package, ...]
     ship_date: date
+    signatory: str
     definition_variant: str | None = None
     requested_mode: TransportMode | None = None
     packing_instruction_section: PackingInstructionSection | None = None

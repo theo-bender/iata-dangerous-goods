@@ -7,6 +7,7 @@ an apparently complete declaration.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from .models import AircraftType, Party
 from .validation import ValidationReport
@@ -36,6 +37,8 @@ class DeclarationData:
     destination_airport: str | None
     lines: tuple[DeclarationLine, ...]
     additional_handling_information: str
+    signatory: str
+    signatory_date: date
 
 
 def build_declaration(report: ValidationReport) -> DeclarationData:
@@ -62,7 +65,7 @@ def build_declaration(report: ValidationReport) -> DeclarationData:
                 "verified DGD wording"
             )
         package_descriptions.append(
-            f"1 {description}, {package.net_quantity} {definition.unit.value}"
+            f"1 {description} x {package.net_quantity} {definition.unit.value}"
         )
 
     line = DeclarationLine(
@@ -95,4 +98,6 @@ def build_declaration(report: ValidationReport) -> DeclarationData:
         destination_airport=shipment.destination_airport,
         lines=(line,),
         additional_handling_information=shipment.additional_handling_information,
+        signatory=shipment.signatory,
+        signatory_date=shipment.ship_date,
     )
