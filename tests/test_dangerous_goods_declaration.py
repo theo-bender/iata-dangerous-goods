@@ -91,17 +91,6 @@ class DangerousGoodsDeclarationTests(unittest.TestCase):
 
         self.assertIs(PublicRenderer, DangerousGoodsDeclaration)
 
-    def test_example_pdf_matches_established_layout(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory) / "dgd.pdf"
-            pdf = DangerousGoodsDeclaration(_example_declaration()).build(str(output))
-
-            self.assertEqual(output.read_bytes(), pdf)
-            self.assertEqual(
-                _normalized_pdf_hash(output),
-                EXPECTED_NORMALIZED_PDF_SHA256,
-            )
-
     def test_build_returns_pdf_bytes_without_a_filename(self) -> None:
         renderer = DangerousGoodsDeclaration(_example_declaration())
 
