@@ -13,6 +13,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 from dg import (
     InnerReceptacle,
+    Overpack,
     Package,
     Party,
     PLASTIC_BOTTLE_IN_4G_BOX_WITH_VERMICULITE,
@@ -34,15 +35,22 @@ EXPECTED_NORMALIZED_PDF_SHA256 = (
 )
 
 
-def _example_declaration():
+def _example_declaration(*, overpacked: bool = False):
+    package = Package(
+        packaging=PLASTIC_BOTTLE_IN_4G_BOX_WITH_VERMICULITE,
+        net_quantity=Decimal("1"),
+        inner_receptacles=(InnerReceptacle(quantity=Decimal("1")),),
+    )
     shipment = Shipment(
         un_number=3266,
-        packages=(
-            Package(
-                packaging=PLASTIC_BOTTLE_IN_4G_BOX_WITH_VERMICULITE,
-                net_quantity=Decimal("1"),
-                inner_receptacles=(InnerReceptacle(quantity=Decimal("1")),),
-            ),
+        packages=() if overpacked else (package,),
+        overpacks=(
+            (
+                Overpack(packages=(package,), identifier="OP-1"),
+                Overpack(packages=(package,), identifier="OP-2"),
+            )
+            if overpacked
+            else ()
         ),
         ship_date=date(2026, 7, 31),
         technical_names=("tripotassium phosphate",),
@@ -103,11 +111,30 @@ class DangerousGoodsDeclarationTests(unittest.TestCase):
         self.assertTrue(pdf.startswith(b"%PDF-"))
         self.assertIsNone(renderer.filename)
 
+    def test_builds_pdf_with_multiple_overpack_lines(self) -> None:
+        declaration = _example_declaration(overpacked=True)
+
+        self.assertEqual(len(declaration.lines), 2)
+        pdf = DangerousGoodsDeclaration(declaration).build()
+
+        self.assertTrue(pdf.startswith(b"%PDF-"))
+
     def test_dynamic_text_is_not_interpreted_as_reportlab_markup(self) -> None:
         value = "A <b>& B</b>"
         paragraph = _value_paragraph(value, getSampleStyleSheet()["Normal"])
 
         self.assertEqual(paragraph.getPlainText(), value)
+
+    def test_dynamic_text_newlines_create_explicit_line_breaks(self) -> None:
+        paragraph = _value_paragraph(
+            "Overpack used\n#OP-1",
+            getSampleStyleSheet()["Normal"],
+        )
+
+        self.assertEqual(
+            paragraph.text,
+            "Overpack used<br/>#OP-1",
+        )
 
     def test_markup_like_values_can_be_rendered_as_literal_text(self) -> None:
         marker = "<not-a-reportlab-tag>"

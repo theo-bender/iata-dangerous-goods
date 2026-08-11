@@ -57,9 +57,10 @@ def measure_paragraph(text: str, style: ParagraphStyle, width: float):
 
 
 def value_paragraph(value: object, style: ParagraphStyle) -> Paragraph:
-    """Create a paragraph from declaration data without interpreting markup."""
+    """Create a paragraph with safe values and explicit newline breaks."""
 
-    return Paragraph(escape(str(value)), style)
+    escaped_value = escape(str(value)).replace("\n", "<br/>")
+    return Paragraph(escaped_value, style)
 
 
 def measure_value(value: object, style: ParagraphStyle, width: float):

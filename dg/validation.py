@@ -8,6 +8,7 @@ from typing import Mapping
 
 from .models import (
     AircraftType,
+    Package,
     PackingInstructionSection,
     Shipment,
     TransportMode,
@@ -319,50 +320,70 @@ def _evaluate_rule(shipment: Shipment, rule: TransportRule) -> RuleEvaluation:
         )
         return RuleEvaluation(rule, tuple(issues))
 
-    for package_index, package in enumerate(shipment.packages):
-        package_path = f"packages[{package_index}]"
-        if (
-            rule.max_package_quantity is not None
-            and package.net_quantity > rule.max_package_quantity
-        ):
-            issues.append(
-                ValidationIssue(
-                    code="package_quantity_exceeded",
-                    message=(
-                        f"Package quantity {package.net_quantity} exceeds the "
-                        f"{rule.max_package_quantity} limit."
-                    ),
-                    path=f"{package_path}.net_quantity",
-                )
-            )
-        if (
-            rule.permitted_packagings
-            and package.packaging not in rule.permitted_packagings
-        ):
-            issues.append(
-                ValidationIssue(
-                    code="packaging_not_permitted",
-                    message=(
-                        f"Packaging '{package.packaging.display_name}' is not permitted."
-                    ),
-                    path=f"{package_path}.packaging",
-                )
-            )
-        if rule.max_inner_quantity is not None:
-            for inner_index, inner in enumerate(package.inner_receptacles):
-                if inner.quantity > rule.max_inner_quantity:
-                    issues.append(
-                        ValidationIssue(
-                            code="inner_quantity_exceeded",
-                            message=(
-                                f"Inner quantity {inner.quantity} exceeds the "
-                                f"{rule.max_inner_quantity} limit."
-                            ),
-                            path=(
-                                f"{package_path}.inner_receptacles"
-                                f"[{inner_index}].quantity"
-                            ),
-                        )
-                    )
+    package_locations = [
+        (f"packages[{package_index}]", package)
+        for package_index, package in enumerate(shipment.packages)
+    ]
+    package_locations.extend(
+        (
+            f"overpacks[{overpack_index}].packages[{package_index}]",
+            package,
+        )
+        for overpack_index, overpack in enumerate(shipment.overpacks)
+        for package_index, package in enumerate(overpack.packages)
+    )
+    for package_path, package in package_locations:
+        _evaluate_package(package, package_path, rule, issues)
 
     return RuleEvaluation(rule, tuple(issues))
+
+
+def _evaluate_package(
+    package: Package,
+    package_path: str,
+    rule: TransportRule,
+    issues: list[ValidationIssue],
+) -> None:
+    if (
+        rule.max_package_quantity is not None
+        and package.net_quantity > rule.max_package_quantity
+    ):
+        issues.append(
+            ValidationIssue(
+                code="package_quantity_exceeded",
+                message=(
+                    f"Package quantity {package.net_quantity} exceeds the "
+                    f"{rule.max_package_quantity} limit."
+                ),
+                path=f"{package_path}.net_quantity",
+            )
+        )
+    if (
+        rule.permitted_packagings
+        and package.packaging not in rule.permitted_packagings
+    ):
+        issues.append(
+            ValidationIssue(
+                code="packaging_not_permitted",
+                message=(
+                    f"Packaging '{package.packaging.display_name}' is not permitted."
+                ),
+                path=f"{package_path}.packaging",
+            )
+        )
+    if rule.max_inner_quantity is not None:
+        for inner_index, inner in enumerate(package.inner_receptacles):
+            if inner.quantity > rule.max_inner_quantity:
+                issues.append(
+                    ValidationIssue(
+                        code="inner_quantity_exceeded",
+                        message=(
+                            f"Inner quantity {inner.quantity} exceeds the "
+                            f"{rule.max_inner_quantity} limit."
+                        ),
+                        path=(
+                            f"{package_path}.inner_receptacles"
+                            f"[{inner_index}].quantity"
+                        ),
+                    )
+                )

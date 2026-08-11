@@ -127,6 +127,30 @@ class Package:
         return self.packaging.code
 
 
+@dataclass(frozen=True)
+class Overpack:
+    """A handling unit containing one or more completed packages.
+
+    An overpack does not replace or alter the packaging used for any enclosed
+    dangerous goods. Each enclosed package remains independently subject to
+    its applicable packing instruction and quantity limits.
+    """
+
+    packages: tuple[Package, ...]
+    identifier: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.packages:
+            raise ValueError("Overpack must contain at least one package")
+        if any(not isinstance(package, Package) for package in self.packages):
+            raise TypeError("Overpack packages must contain Package objects")
+        if self.identifier is not None:
+            identifier = self.identifier.strip()
+            if not identifier:
+                raise ValueError("Overpack identifier cannot be blank")
+            object.__setattr__(self, "identifier", identifier)
+
+
 @dataclass(frozen=True, kw_only=True)
 class Party:
     name: str
@@ -159,12 +183,26 @@ class Shipment:
     destination_airport: str | None = None
     additional_handling_information: str = ""
     metadata: dict[str, str] = field(default_factory=dict, compare=False)
+    overpacks: tuple[Overpack, ...] = ()
 
     def __post_init__(self) -> None:
         if not 1 <= self.un_number <= 9999:
             raise ValueError("UN number must be between 0001 and 9999")
-        if not self.packages:
+        if any(not isinstance(package, Package) for package in self.packages):
+            raise TypeError("Shipment packages must contain Package objects")
+        if any(not isinstance(overpack, Overpack) for overpack in self.overpacks):
+            raise TypeError("Shipment overpacks must contain Overpack objects")
+        if not self.packages and not self.overpacks:
             raise ValueError("Shipment must contain at least one package")
+        if len(self.overpacks) > 1:
+            identifiers = [overpack.identifier for overpack in self.overpacks]
+            if any(identifier is None for identifier in identifiers):
+                raise ValueError(
+                    "Every overpack requires an identifier when multiple "
+                    "overpacks are used"
+                )
+            if len(set(identifiers)) != len(identifiers):
+                raise ValueError("Overpack identifiers must be unique")
         if not self.signatory.strip():
             raise ValueError("Shipment signatory is required")
         object.__setattr__(self, "signatory", self.signatory.strip())

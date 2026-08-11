@@ -9,6 +9,7 @@ from dg.models import (
     HazardClass,
     InnerReceptacle,
     LithiumIonBattery,
+    Overpack,
     Package,
     PackingGroup,
     PackingInstructionSection,
@@ -146,6 +147,113 @@ class ValidationTests(unittest.TestCase):
                 net_quantity=Decimal("1"),
             )
 
+    def test_overpack_requires_completed_packages(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at least one package"):
+            Overpack(packages=())
+
+        with self.assertRaisesRegex(TypeError, "Package objects"):
+            Overpack(packages=("package",))  # type: ignore[arg-type]
+
+    def test_overpack_rejects_a_blank_identifier(self) -> None:
+        with self.assertRaisesRegex(ValueError, "cannot be blank"):
+            Overpack(packages=shipment().packages, identifier="  ")
+
+    def test_shipment_accepts_only_overpacked_packages(self) -> None:
+        proposed = shipment(
+            packages=(),
+            overpacks=(Overpack(packages=shipment().packages),),
+        )
+
+        report = validate_shipment(proposed, {(9999, None): DEFINITION})
+
+        self.assertTrue(report.is_valid)
+
+    def test_shipment_requires_a_loose_or_overpacked_package(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at least one package"):
+            shipment(packages=(), overpacks=())
+
+    def test_multiple_overpacks_require_unique_identifiers(self) -> None:
+        package = shipment().packages[0]
+
+        with self.assertRaisesRegex(ValueError, "requires an identifier"):
+            shipment(
+                packages=(),
+                overpacks=(
+                    Overpack(packages=(package,)),
+                    Overpack(packages=(package,), identifier="OP-2"),
+                ),
+            )
+
+        with self.assertRaisesRegex(ValueError, "must be unique"):
+            shipment(
+                packages=(),
+                overpacks=(
+                    Overpack(packages=(package,), identifier="OP-1"),
+                    Overpack(packages=(package,), identifier=" OP-1 "),
+                ),
+            )
+
+    def test_overpacked_packages_are_validated_with_nested_paths(self) -> None:
+        unapproved_packaging = replace(TEST_PACKAGING, code="unapproved_box")
+        overpack = Overpack(
+            packages=(
+                Package(
+                    packaging=unapproved_packaging,
+                    net_quantity=Decimal("6"),
+                    inner_receptacles=(InnerReceptacle(Decimal("2")),),
+                ),
+            ),
+        )
+        proposed = shipment(
+            packages=(),
+            overpacks=(overpack,),
+            requested_mode=TransportMode.LIMITED_QUANTITY,
+        )
+
+        report = validate_shipment(proposed, {(9999, None): DEFINITION})
+
+        self.assertFalse(report.is_valid)
+        self.assertEqual(
+            {
+                (issue.code, issue.path)
+                for issue in report.issues
+                if issue.path is not None
+            },
+            {
+                (
+                    "package_quantity_exceeded",
+                    "overpacks[0].packages[0].net_quantity",
+                ),
+                (
+                    "packaging_not_permitted",
+                    "overpacks[0].packages[0].packaging",
+                ),
+                (
+                    "inner_quantity_exceeded",
+                    "overpacks[0].packages[0].inner_receptacles[0].quantity",
+                ),
+            },
+        )
+
+    def test_overpack_quantity_is_not_treated_as_one_package(self) -> None:
+        packages = tuple(
+            Package(
+                packaging=TEST_PACKAGING,
+                net_quantity=Decimal("4"),
+                inner_receptacles=(InnerReceptacle(Decimal("1")),),
+            )
+            for _ in range(2)
+        )
+        proposed = shipment(
+            packages=(),
+            overpacks=(Overpack(packages=packages),),
+            requested_mode=TransportMode.LIMITED_QUANTITY,
+        )
+
+        report = validate_shipment(proposed, {(9999, None): DEFINITION})
+
+        self.assertTrue(report.is_valid)
+
     def test_falls_back_when_limited_quantity_is_exceeded(self) -> None:
         report = validate_shipment(shipment(net="6"), {(9999, None): DEFINITION})
 
@@ -232,6 +340,122 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(
             declaration.lines[0].quantity_and_type_of_packing,
             "1 Fibreboard Box x 6 L",
+        )
+
+    def test_declaration_adds_overpack_wording(self) -> None:
+        package = shipment(net="6").packages[0]
+        proposed = shipment(
+            packages=(),
+            overpacks=(Overpack(packages=(package,), identifier="OP-1"),),
+            requested_mode=TransportMode.PASSENGER_AND_CARGO,
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(name="Example Consignee", address=["2 Destination Road"]),
+        )
+
+        declaration = build_declaration(
+            validate_shipment(proposed, {(9999, None): DEFINITION})
+        )
+
+        self.assertEqual(len(declaration.lines), 1)
+        self.assertEqual(
+            declaration.lines[0].quantity_and_type_of_packing,
+            "1 Fibreboard Box x 6 L\n"
+            "Overpack used\n"
+            "#OP-1\n"
+            "Net quantity 6 L",
+        )
+
+    def test_declaration_consolidates_identical_overpacked_packages(self) -> None:
+        package = shipment(net="1").packages[0]
+        proposed = shipment(
+            packages=(),
+            overpacks=(
+                Overpack(
+                    packages=(package, package),
+                    identifier="OP-1",
+                ),
+            ),
+            requested_mode=TransportMode.PASSENGER_AND_CARGO,
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(name="Example Consignee", address=["2 Destination Road"]),
+        )
+
+        declaration = build_declaration(
+            validate_shipment(proposed, {(9999, None): DEFINITION})
+        )
+
+        self.assertEqual(
+            declaration.lines[0].quantity_and_type_of_packing,
+            "2 Fibreboard Boxes x 1 L\n"
+            "Overpack used\n"
+            "#OP-1\n"
+            "Net quantity 2 L",
+        )
+
+    def test_declaration_identifies_and_totals_multiple_overpacks(self) -> None:
+        def package(quantity: str) -> Package:
+            return Package(
+                packaging=TEST_PACKAGING,
+                net_quantity=Decimal(quantity),
+                inner_receptacles=(InnerReceptacle(Decimal("1")),),
+            )
+
+        proposed = shipment(
+            packages=(),
+            overpacks=(
+                Overpack(
+                    packages=(package("6"), package("4")),
+                    identifier="OP-1",
+                ),
+                Overpack(packages=(package("8"),), identifier="OP-2"),
+            ),
+            requested_mode=TransportMode.PASSENGER_AND_CARGO,
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(name="Example Consignee", address=["2 Destination Road"]),
+        )
+
+        declaration = build_declaration(
+            validate_shipment(proposed, {(9999, None): DEFINITION})
+        )
+
+        self.assertEqual(
+            tuple(line.quantity_and_type_of_packing for line in declaration.lines),
+            (
+                "1 Fibreboard Box x 6 L\n"
+                "1 Fibreboard Box x 4 L\n"
+                "Overpack used\n"
+                "#OP-1\n"
+                "Net quantity 10 L",
+                "1 Fibreboard Box x 8 L\n"
+                "Overpack used\n"
+                "#OP-2\n"
+                "Net quantity 8 L",
+            ),
+        )
+
+    def test_declaration_separates_loose_and_overpacked_packages(self) -> None:
+        loose_package = shipment(net="6").packages[0]
+        overpacked_package = replace(loose_package, net_quantity=Decimal("7"))
+        proposed = shipment(
+            packages=(loose_package,),
+            overpacks=(Overpack(packages=(overpacked_package,)),),
+            requested_mode=TransportMode.PASSENGER_AND_CARGO,
+            shipper=Party(name="Example Shipper", address=["1 Origin Way"]),
+            consignee=Party(name="Example Consignee", address=["2 Destination Road"]),
+        )
+
+        declaration = build_declaration(
+            validate_shipment(proposed, {(9999, None): DEFINITION})
+        )
+
+        self.assertEqual(
+            tuple(line.quantity_and_type_of_packing for line in declaration.lines),
+            (
+                "1 Fibreboard Box x 6 L",
+                "1 Fibreboard Box x 7 L\n"
+                "Overpack used\n"
+                "Net quantity 7 L",
+            ),
         )
 
     def test_declaration_reports_radioactive_hazards(self) -> None:
