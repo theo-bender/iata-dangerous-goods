@@ -12,8 +12,8 @@ requires a Shipper's Declaration.
 
 ## Installation
 
-`iata-dangerous-goods` requires Python 3.11 or later and has no runtime
-dependencies.
+`iata-dangerous-goods` requires Python 3.11 or later. ReportLab is installed as
+a runtime dependency for rendering Shipper's Declaration PDFs.
 
 ```console
 python -m pip install iata-dangerous-goods
@@ -114,6 +114,66 @@ Package(
 `Package.packaging_code` remains available when a stable string identifier is
 needed for JSON, forms, or database storage.
 
+## Group packages in overpacks
+
+An `Overpack` is a handling unit around one or more completed packages; it is
+not a packaging configuration and does not belong in the packaging catalog.
+Every enclosed `Package` is still checked independently against the selected
+packing instruction, including its package and inner-receptacle quantities.
+
+Import `Overpack` from the public package and place completed packages inside
+it. `Shipment.packages` contains packages that remain loose:
+
+```python
+from dg import Overpack
+
+loose_only = Shipment(
+    un_number=3266,
+    packages=(package_a,),
+    # remaining shipment fields...
+)
+
+overpack_only = Shipment(
+    un_number=3266,
+    packages=(),
+    overpacks=(
+        Overpack(packages=(package_a, package_b), identifier="OP-1"),
+    ),
+    # remaining shipment fields...
+)
+
+mixed = Shipment(
+    un_number=3266,
+    packages=(package_a,),
+    overpacks=(
+        Overpack(packages=(package_b,), identifier="OP-1"),
+    ),
+    # remaining shipment fields...
+)
+```
+
+A single overpack may omit its identifier. When a shipment contains multiple
+overpacks, every overpack must have a unique, nonblank identifier matching its
+physical identification mark. Declaration generation creates a separate line
+for loose packages and for each overpack, adds `Overpack used`, and includes
+the identifier and total dangerous-goods quantity. Packages in the same
+overpack that have the same controlled DGD packaging description and
+per-package quantity are consolidated.
+
+Each overpack's declaration entry is displayed on separate lines, with the
+identifier between the required overpack statement and package details:
+
+```text
+2 Fibreboard Boxes x 1 L
+Overpack used
+#OP-1
+Net quantity 2 L
+```
+
+Overpack support is intentionally limited to the shipment's one dangerous-
+goods definition. The library does not currently validate mixed-UN
+compatibility or generate and inspect physical overpack marks and labels.
+
 Each starter entry has `verified_against_dgr=False`. Set that flag and add its
 packing-instruction source references only after checking the exact physical
 configuration against the current DGR.
@@ -121,7 +181,7 @@ configuration against the current DGR.
 `PackagingDefinition.dgd_packaging_description` stores the controlled package
 type wording required in the declaration's Quantity and Type of Packing field.
 For example, the 4G box configurations use `Fibreboard Box`, producing output
-such as `1 Fibreboard Box, 4 L`. Friendly display names and free-text packaging
+such as `1 Fibreboard Box x 4 L`. Friendly display names and free-text packaging
 instructions are never substituted into this DGD field. Declaration generation
 stops if the selected packaging has no verified DGD wording.
 
@@ -138,6 +198,22 @@ Shipment(
 
 The declaration builder renders these immediately after the base proper
 shipping name as `PROPER SHIPPING NAME (chemical A, chemical B)`.
+
+Build the declaration PDF in memory when it is ready to return from an API,
+attach to a message, or store in an object store:
+
+```python
+from dg import DangerousGoodsDeclaration
+
+pdf_bytes = DangerousGoodsDeclaration(declaration).build()
+```
+
+Passing a filename remains available when an explicit file copy is useful.
+The same PDF bytes are returned in either case:
+
+```python
+pdf_bytes = DangerousGoodsDeclaration(declaration).build("declaration.pdf")
+```
 
 ## Run the tests
 

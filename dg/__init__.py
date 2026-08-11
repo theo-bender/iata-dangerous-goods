@@ -6,6 +6,7 @@ from .models import (
     HazardClass,
     InnerReceptacle,
     LithiumIonBattery,
+    Overpack,
     Package,
     PackingGroup,
     PackingInstructionSection,
@@ -36,16 +37,26 @@ from .validation import (
     validate_shipment,
 )
 
+from .dangerous_goods_declaration import (
+    DangerousGoodsDeclaration,
+    BoxOverflowError,
+    FieldWrapError
+)
+
 __all__ = [
     "AircraftType",
     "BOTTLE_OR_CARTRIDGE_IN_ABSORBENT_MAT_AND_BAG",
+    "BoxOverflowError",
+    "DangerousGoodsDeclaration",
     "DangerousGoodsDefinition",
     "DeclarationData",
     "DeclarationLine",
+    "FieldWrapError",
     "HazardClass",
     "InnerReceptacle",
     "LithiumIonBattery",
     "EQUIPMENT_IN_HARD_SHELL_CASE_WITH_FOAM",
+    "Overpack",
     "Package",
     "PACKAGING_DEFINITIONS",
     "PLASTIC_BOTTLE_IN_4G_BOX_WITH_VERMICULITE",
