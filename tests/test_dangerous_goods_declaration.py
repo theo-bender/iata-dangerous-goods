@@ -8,8 +8,13 @@ from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
 
 from dg import (
     InnerReceptacle,
@@ -28,6 +33,7 @@ from dg.dangerous_goods_declaration import (
     FieldWrapError,
     _value_paragraph,
 )
+from dg._pdf.page import HATCH_BAND_WIDTH
 
 
 EXPECTED_NORMALIZED_PDF_SHA256 = (
@@ -85,6 +91,44 @@ def _normalized_pdf_hash(path: Path) -> str:
     return hashlib.sha256(pdf).hexdigest()
 
 
+class _RecordingPath:
+    def __init__(self):
+        self.points = []
+        self.closed = False
+
+    def moveTo(self, x, y):
+        self.points.append((x, y))
+
+    def lineTo(self, x, y):
+        self.points.append((x, y))
+
+    def close(self):
+        self.closed = True
+
+
+class _RecordingCanvas:
+    def __init__(self):
+        self.saved_states = 0
+        self.restored_states = 0
+        self.fill_colors = []
+        self.paths = []
+
+    def saveState(self):
+        self.saved_states += 1
+
+    def restoreState(self):
+        self.restored_states += 1
+
+    def setFillColor(self, color):
+        self.fill_colors.append(color)
+
+    def beginPath(self):
+        return _RecordingPath()
+
+    def drawPath(self, path, *, stroke, fill):
+        self.paths.append((path, stroke, fill))
+
+
 class DangerousGoodsDeclarationTests(unittest.TestCase):
     def test_direct_import_path_remains_compatible(self) -> None:
         from dg import DangerousGoodsDeclaration as PublicRenderer
@@ -99,6 +143,107 @@ class DangerousGoodsDeclarationTests(unittest.TestCase):
         self.assertIsInstance(pdf, bytes)
         self.assertTrue(pdf.startswith(b"%PDF-"))
         self.assertIsNone(renderer.filename)
+
+    def test_hatched_margins_default_to_disabled(self) -> None:
+        renderer = DangerousGoodsDeclaration(_example_declaration())
+
+        with patch.object(
+            renderer,
+            "draw_hatched_margins",
+            wraps=renderer.draw_hatched_margins,
+        ) as draw_hatched_margins:
+            renderer.build()
+            renderer.build(hatched_margins=False)
+
+        draw_hatched_margins.assert_not_called()
+
+    def test_hatched_margins_are_scoped_to_each_build(self) -> None:
+        renderer = DangerousGoodsDeclaration(_example_declaration())
+
+        with patch.object(
+            renderer,
+            "draw_hatched_margins",
+            wraps=renderer.draw_hatched_margins,
+        ) as draw_hatched_margins:
+            renderer.build(hatched_margins=True)
+            self.assertEqual(draw_hatched_margins.call_count, 1)
+
+            draw_hatched_margins.reset_mock()
+            renderer.build()
+
+        draw_hatched_margins.assert_not_called()
+
+    def test_hatched_margins_can_be_written_to_a_file(self) -> None:
+        renderer = DangerousGoodsDeclaration(_example_declaration())
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "hatched.pdf"
+            pdf = renderer.build(str(output), hatched_margins=True)
+
+            self.assertEqual(output.read_bytes(), pdf)
+            self.assertTrue(pdf.startswith(b"%PDF-"))
+
+    def test_hatched_margins_are_drawn_on_every_page(self) -> None:
+        declaration = _example_declaration()
+        declaration = replace(declaration, lines=declaration.lines * 80)
+        renderer = DangerousGoodsDeclaration(declaration)
+
+        with (
+            patch.object(
+                renderer,
+                "draw_hatched_margins",
+                wraps=renderer.draw_hatched_margins,
+            ) as draw_hatched_margins,
+            patch.object(
+                renderer,
+                "draw_page",
+                wraps=renderer.draw_page,
+            ) as draw_page,
+        ):
+            pdf = renderer.build(hatched_margins=True)
+
+        self.assertTrue(pdf.startswith(b"%PDF-"))
+        self.assertGreater(draw_page.call_count, 1)
+        self.assertEqual(draw_hatched_margins.call_count, draw_page.call_count)
+
+    def test_hatched_margin_geometry_uses_both_full_height_side_margins(self) -> None:
+        renderer = DangerousGoodsDeclaration(_example_declaration())
+        page_canvas = _RecordingCanvas()
+        doc = SimpleNamespace(
+            pagesize=letter,
+            leftMargin=0.875 * inch,
+            rightMargin=0.875 * inch,
+        )
+
+        renderer.draw_hatched_margins(page_canvas, doc)
+
+        self.assertEqual(page_canvas.saved_states, 1)
+        self.assertEqual(page_canvas.restored_states, 1)
+        self.assertEqual(page_canvas.fill_colors, [colors.red])
+        self.assertGreater(len(page_canvas.paths), 2)
+        self.assertEqual(len(page_canvas.paths) % 2, 0)
+        self.assertTrue(
+            all(
+                path.closed and stroke == 0 and fill == 1
+                for path, stroke, fill in page_canvas.paths
+            )
+        )
+
+        left_path = page_canvas.paths[0][0]
+        right_path = page_canvas.paths[1][0]
+        left_edge = min(x for x, _ in left_path.points)
+        right_edge = max(x for x, _ in right_path.points)
+        expected_outer_gap = (doc.leftMargin - HATCH_BAND_WIDTH) / 2
+        self.assertAlmostEqual(left_edge, expected_outer_gap)
+        self.assertAlmostEqual(letter[0] - right_edge, expected_outer_gap)
+
+        all_y_coordinates = [
+            y
+            for path, _, _ in page_canvas.paths
+            for _, y in path.points
+        ]
+        self.assertLess(min(all_y_coordinates), 0)
+        self.assertGreater(max(all_y_coordinates), letter[1])
 
     def test_builds_pdf_with_multiple_overpack_lines(self) -> None:
         declaration = _example_declaration(overpacked=True)
