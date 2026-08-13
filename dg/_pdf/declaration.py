@@ -149,7 +149,12 @@ class DangerousGoodsDeclaration(DeclarationPageRenderer):
         ]))
         return [table]
 
-    def build(self, filename: str | None = None) -> bytes:
+    def build(
+        self,
+        filename: str | None = None,
+        *,
+        hatched_margins: bool = False,
+    ) -> bytes:
         """Build and return the PDF, optionally writing a copy to ``filename``."""
 
         if filename is not None and not filename.endswith(".pdf"):
@@ -167,7 +172,10 @@ class DangerousGoodsDeclaration(DeclarationPageRenderer):
             bottomMargin=self.bottom_margin,
         )
 
-        template = self._build_page_template(doc)
+        template = self._build_page_template(
+            doc,
+            hatched_margins=hatched_margins,
+        )
         story = self._build_story(doc)
         doc.addPageTemplates([template])
         doc.build(

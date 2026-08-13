@@ -208,11 +208,29 @@ from dg import DangerousGoodsDeclaration
 pdf_bytes = DangerousGoodsDeclaration(declaration).build()
 ```
 
+To include the red diagonal hatching used in the left and right margins of
+IATA-style declarations, enable it for that build:
+
+```python
+pdf_bytes = DangerousGoodsDeclaration(declaration).build(
+    hatched_margins=True,
+)
+```
+
 Passing a filename remains available when an explicit file copy is useful.
 The same PDF bytes are returned in either case:
 
 ```python
 pdf_bytes = DangerousGoodsDeclaration(declaration).build("declaration.pdf")
+```
+
+The option can also be used when writing a file:
+
+```python
+pdf_bytes = DangerousGoodsDeclaration(declaration).build(
+    "declaration.pdf",
+    hatched_margins=True,
+)
 ```
 
 ## Run the tests
